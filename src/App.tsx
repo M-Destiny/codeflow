@@ -39,7 +39,7 @@ export default function App() {
           return prev;
         });
       });
-      return () => s.disconnect();
+      return () => { s.disconnect(); };
     }
   }, [joined]);
 
