@@ -1,4 +1,4 @@
-import { MetricValue } from '../monitoring/metrics.js';
+import { MetricsCollector } from '../monitoring/metrics.js';
 
 interface RateLimitEntry { count: number; resetAt: number; }
 type CompletionFn = (prompt: string) => Promise<string>;
