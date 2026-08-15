@@ -1,0 +1,38 @@
+# Render.com Blueprint — free tier
+# Deploy: render.com/blueprints → Connect this repo
+
+services:
+  - type: web
+    name: codeflow-server
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node dist/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+
+  - type: web
+    name: codeflow-client
+    runtime: static
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build && npm run export
+    staticPublishPath: out
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: codeflow-server
+          envVarKey: RENDER_EXTERNAL_URL

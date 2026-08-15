@@ -1,0 +1,36 @@
+# Cloudflare Workers deployment
+# wrangler.toml — Workers + Pages for CodeFlow
+
+name = "codeflow"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+account_id = ""
+
+[site]
+bucket = "./dist"
+include = ["client/dist"]
+exclude = ["node_modules", ".git"]
+
+# KV namespaces for session storage
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = ""
+
+[[kv_namespaces]]
+binding = "DOCUMENTS"
+id = ""
+
+# Durable Objects for WebSocket coordination
+[[durable_objects.bindings]]
+name = "COLLAB_ROOM"
+class_name = "CollabRoom"
+
+# Environment variables
+[env.production]
+vars = { NODE_ENV = "production" }
+kv_namespaces = []
+durable_objects = []
+
+# Secrets (set via CLI)
+# wrangler secret put OPENAI_API_KEY
+# wrangler secret put REDIS_URL
