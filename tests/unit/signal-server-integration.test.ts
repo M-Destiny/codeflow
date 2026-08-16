@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, TestContext } from 'vitest';
 import { Server as SocketServer } from 'socket.io';
 import { createServer } from 'http';
 import { SignalServer } from '../../src/server/signal-server.js';
@@ -10,7 +10,7 @@ describe('SignalServer Integration', () => {
   let signal: SignalServer;
   let clientSocket: any;
 
-  beforeEach((done) => {
+  beforeEach((done: () => void) => {
     httpServer = createServer();
     io = new SocketServer(httpServer, {
       cors: { origin: '*', methods: ['GET', 'POST'] },
@@ -35,7 +35,7 @@ describe('SignalServer Integration', () => {
   });
 
   describe('Room Join', () => {
-    it('should allow user to join a room and receive self info', (done) => {
+    it('should allow user to join a room and receive self info', (done: () => void) => {
       clientSocket.emit('room:join', { roomId: 'test-room', userName: 'Alice' });
       clientSocket.on('user:self', (data: any) => {
         expect(data.userId).toBeDefined();
@@ -46,7 +46,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should broadcast user:join to other users in room', (done) => {
+    it('should broadcast user:join to other users in room', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -69,7 +69,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should reject invalid room ID', (done) => {
+    it('should reject invalid room ID', (done: () => void) => {
       clientSocket.emit('room:join', { roomId: 'room@#$%', userName: 'Alice' });
       clientSocket.on('error', (data: any) => {
         expect(data.code).toBe('INVALID_INPUT');
@@ -77,7 +77,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should reject invalid user name', (done) => {
+    it('should reject invalid user name', (done: () => void) => {
       clientSocket.emit('room:join', { roomId: 'valid-room', userName: '<script>alert(1)</script>' });
       clientSocket.on('error', (data: any) => {
         expect(data.code).toBe('INVALID_INPUT');
@@ -85,7 +85,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should enforce rate limit on room:join', (done) => {
+    it('should enforce rate limit on room:join', (done: () => void) => {
       const joinCount = 35; // Exceeds MAX_EVENTS_PER_WINDOW (30)
       let rejected = false;
       
@@ -107,12 +107,12 @@ describe('SignalServer Integration', () => {
   });
 
   describe('Cursor Updates', () => {
-    beforeEach((done) => {
+    beforeEach((done: () => void) => {
       clientSocket.emit('room:join', { roomId: 'cursor-room', userName: 'Alice' });
       clientSocket.on('user:self', () => done());
     });
 
-    it('should broadcast cursor updates to others in room', (done) => {
+    it('should broadcast cursor updates to others in room', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -134,7 +134,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should reject invalid cursor positions', (done) => {
+    it('should reject invalid cursor positions', (done: () => void) => {
       clientSocket.emit('cursor:update', { line: -1, column: 5 });
       clientSocket.emit('cursor:update', { line: 10, column: -1 });
       clientSocket.emit('cursor:update', { line: 'invalid', column: 5 });
@@ -145,7 +145,7 @@ describe('SignalServer Integration', () => {
       }, 50);
     });
 
-    it('should enforce rate limit on cursor updates', (done) => {
+    it('should enforce rate limit on cursor updates', (done: () => void) => {
       let updateCount = 0;
       
       for (let i = 0; i < 35; i++) {
@@ -160,12 +160,12 @@ describe('SignalServer Integration', () => {
   });
 
   describe('Operations', () => {
-    beforeEach((done) => {
+    beforeEach((done: () => void) => {
       clientSocket.emit('room:join', { roomId: 'ops-room', userName: 'Alice' });
       clientSocket.on('user:self', () => done());
     });
 
-    it('should broadcast insert operations', (done) => {
+    it('should broadcast insert operations', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -187,7 +187,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should broadcast delete operations', (done) => {
+    it('should broadcast delete operations', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -207,7 +207,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should reject invalid operations', (done) => {
+    it('should reject invalid operations', (done: () => void) => {
       clientSocket.emit('operation', { type: 'invalid', pos: 0 });
       clientSocket.emit('operation', { type: 'insert', pos: -1, text: 'test' });
       clientSocket.emit('operation', { type: 'delete', pos: 0, length: -1 });
@@ -220,12 +220,12 @@ describe('SignalServer Integration', () => {
   });
 
   describe('Chat Messages', () => {
-    beforeEach((done) => {
+    beforeEach((done: () => void) => {
       clientSocket.emit('room:join', { roomId: 'chat-room', userName: 'Alice' });
       clientSocket.on('user:self', () => done());
     });
 
-    it('should broadcast chat messages to all in room', (done) => {
+    it('should broadcast chat messages to all in room', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -253,7 +253,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should sanitize chat messages (remove control chars, limit length)', (done) => {
+    it('should sanitize chat messages (remove control chars, limit length)', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -273,7 +273,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should limit chat message length to 1000 chars', (done) => {
+    it('should limit chat message length to 1000 chars', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -296,12 +296,12 @@ describe('SignalServer Integration', () => {
   });
 
   describe('WebRTC Signaling', () => {
-    beforeEach((done) => {
+    beforeEach((done: () => void) => {
       clientSocket.emit('room:join', { roomId: 'rtc-room', userName: 'Alice' });
       clientSocket.on('user:self', () => done());
     });
 
-    it('should relay RTC offer to target peer', (done) => {
+    it('should relay RTC offer to target peer', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -326,7 +326,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should relay RTC answer to target peer', (done) => {
+    it('should relay RTC answer to target peer', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -351,7 +351,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should relay ICE candidates', (done) => {
+    it('should relay ICE candidates', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -376,7 +376,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should signal ICE restart to remote peer', (done) => {
+    it('should signal ICE restart to remote peer', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -401,7 +401,7 @@ describe('SignalServer Integration', () => {
   });
 
   describe('Disconnect', () => {
-    it('should broadcast user:leave when user disconnects', (done) => {
+    it('should broadcast user:leave when user disconnects', (done: () => void) => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
@@ -431,7 +431,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should clean up rate limits on disconnect', (done) => {
+    it('should clean up rate limits on disconnect', (done: () => void) => {
       // Fill rate limit
       for (let i = 0; i < 35; i++) {
         clientSocket.emit('cursor:update', { line: i, column: i });
@@ -464,7 +464,7 @@ describe('SignalServer Integration', () => {
       expect(signal.getRoomSize('non-existent')).toBe(0);
     });
 
-    it('should track room size after joins', (done) => {
+    it('should track room size after joins', (done: () => void) => {
       clientSocket.emit('room:join', { roomId: 'size-room', userName: 'Alice' });
       clientSocket.on('user:self', () => {
         expect(signal.getRoomSize('size-room')).toBe(1);
@@ -493,7 +493,7 @@ describe('SignalServer Sanitization Integration', () => {
   let signal: SignalServer;
   let clientSocket: any;
 
-  beforeEach((done) => {
+  beforeEach((done: () => void) => {
     httpServer = createServer();
     io = new SocketServer(httpServer, { cors: { origin: '*' } });
     signal = new SignalServer(io);
@@ -511,7 +511,7 @@ describe('SignalServer Sanitization Integration', () => {
     httpServer?.close();
   });
 
-  it('should sanitize room ID on join', (done) => {
+  it('should sanitize room ID on join', (done: () => void) => {
     clientSocket.emit('room:join', { roomId: 'Room@#$%With!Special*Chars', userName: 'Alice' });
     clientSocket.on('user:self', (data: any) => {
       // Room ID should be sanitized to alphanumeric, hyphen, underscore
@@ -520,7 +520,7 @@ describe('SignalServer Sanitization Integration', () => {
     });
   });
 
-  it('should sanitize user name on join', (done) => {
+  it('should sanitize user name on join', (done: () => void) => {
     clientSocket.emit('room:join', { roomId: 'valid-room', userName: 'User<script>alert(1)</script>' });
     clientSocket.on('user:self', (data: any) => {
       expect(data.userName).toBe('Userscriptalert1script');
@@ -528,7 +528,7 @@ describe('SignalServer Sanitization Integration', () => {
     });
   });
 
-  it('should sanitize chat messages', (done) => {
+  it('should sanitize chat messages', (done: () => void) => {
     clientSocket.emit('room:join', { roomId: 'sanitize-room', userName: 'Alice' });
     clientSocket.on('user:self', () => {
       const { io: clientIO } = require('socket.io-client');
@@ -549,7 +549,7 @@ describe('SignalServer Sanitization Integration', () => {
     });
   });
 
-  it('should sanitize operations', (done) => {
+  it('should sanitize operations', (done: () => void) => {
     clientSocket.emit('room:join', { roomId: 'ops-sanitize', userName: 'Alice' });
     clientSocket.on('user:self', () => {
       const { io: clientIO } = require('socket.io-client');
