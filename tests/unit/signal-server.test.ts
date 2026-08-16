@@ -108,7 +108,7 @@ describe('Sanitize Utilities (used by SignalServer)', () => {
     it('should escape HTML special characters', () => {
       expect(sanitizeHtml("<script>alert(1)</script>")).toBe("<script>alert(1)<&#x2F;script>");
       expect(sanitizeHtml('"quoted"')).toBe('&#x22;quoted&#x22;');
-      expect(sanitizeHtml("'single'")).toBe(''single'');
+      expect(sanitizeHtml("'single'")).toBe("'single'");
       expect(sanitizeHtml('a&b')).toBe('a&b');
     });
   });
