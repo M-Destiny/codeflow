@@ -502,4 +502,11 @@ describe('SignalServer Sanitization Integration', () => {
     });
   });
 
-  it('should sanitize user name on join', (done: () => voi
+  it('should sanitize user name on join', (done: () => void) => {
+    clientSocket.emit('room:join', { roomId: 'valid-room', userName: 'User<script>alert(1)</script>' });
+    clientSocket.on('user:self', (data: any) => {
+      expect(data.userName).toBe('Useralert1script');
+      done();
+    });
+  });
+});
