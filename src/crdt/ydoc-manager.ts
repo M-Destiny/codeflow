@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { sanitizeOperation } from '../utils/sanitize.js';
 
 export class YDocManager {
   private docs = new Map<string, Y.Doc>();
@@ -13,14 +14,17 @@ export class YDocManager {
   }
 
   applyOp(docId: string, op: { type: string; pos: number; text?: string; length?: number }): void {
+    const sanitized = sanitizeOperation(op);
+    if (!sanitized) return;
+
     const doc = this.getOrCreate(docId);
     const ytext = doc.getText('content');
 
     doc.transact(() => {
-      if (op.type === 'insert' && op.text) {
-        ytext.insert(op.pos, op.text);
-      } else if (op.type === 'delete' && op.length) {
-        ytext.delete(op.pos, op.length);
+      if (sanitized.type === 'insert' && sanitized.text) {
+        ytext.insert(sanitized.pos, sanitized.text);
+      } else if (sanitized.type === 'delete' && sanitized.length) {
+        ytext.delete(sanitized.pos, sanitized.length);
       }
     });
   }
