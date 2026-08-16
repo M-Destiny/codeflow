@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { Awareness } from 'y-protocols/awareness.js';
 import { sanitizeOperation } from '../utils/sanitize.js';
 
 interface AwarenessState {
@@ -9,7 +10,7 @@ interface AwarenessState {
 
 export class YDocManager {
   private docs = new Map<string, Y.Doc>();
-  private awarenessMap = new Map<string, Y.Awareness>();
+  private awarenessMap = new Map<string, Awareness>();
 
   getOrCreate(docId: string): Y.Doc {
     let doc = this.docs.get(docId);
@@ -17,7 +18,7 @@ export class YDocManager {
       doc = new Y.Doc();
       this.docs.set(docId, doc);
       // Initialize awareness for this doc
-      this.awarenessMap.set(docId, new Y.Awareness(doc));
+      this.awarenessMap.set(docId, new Awareness(doc));
     }
     return doc;
   }
@@ -44,7 +45,7 @@ export class YDocManager {
     return doc.getText('content').toString();
   }
 
-  getAwareness(docId: string): Y.Awareness | null {
+  getAwareness(docId: string): Awareness | null {
     return this.awarenessMap.get(docId) ?? null;
   }
 
@@ -63,9 +64,8 @@ export class YDocManager {
   onAwarenessChange(docId: string, callback: (states: Map<number, AwarenessState>, added: number[], updated: number[], removed: number[]) => void): (() => void) | null {
     const awareness = this.awarenessMap.get(docId);
     if (!awareness) return null;
-    const handler = () => {
-      const { added, updated, removed } = awareness.getStates();
-      callback(awareness.getStates(), added, updated, removed);
+    const handler = ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }) => {
+      callback(awareness.getStates() as Map<number, AwarenessState>, added, updated, removed);
     };
     awareness.on('change', handler);
     return () => awareness.off('change', handler);
