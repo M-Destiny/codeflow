@@ -70,28 +70,30 @@ export class AIPairProgrammer {
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expires > Date.now()) return cached.result;
 
+    let result: any;
+
     if (!this.completions) {
-      return { startLine: cursorPos.line, endLine: cursorPos.line, suggestion: '// Configure OPENAI_API_KEY or MINIMAX_API_KEY to enable AI suggestions', confidence: 0 };
+      result = { startLine: cursorPos.line, endLine: cursorPos.line, suggestion: '// Configure OPENAI_API_KEY or MINIMAX_API_KEY to enable AI suggestions', confidence: 0 };
+    } else {
+      const lines = code.split('\n');
+      const context = lines.slice(Math.max(0, cursorPos.line - 10), cursorPos.line + 5).join('\n');
+
+      const completion = await this.completions(
+        `Given this code context (cursor at line ${cursorPos.line}, column ${cursorPos.column}):\n${context}\n\nSuggest the next line(s) to complete the current function. Reply ONLY with the code suggestion, no explanation.`
+      );
+
+      result = {
+        startLine: cursorPos.line,
+        endLine: cursorPos.line + completion.split('\n').length - 1,
+        suggestion: completion.trim(),
+        confidence: 0.7,
+        model: process.env.MINIMAX_API_KEY ? 'MiniMax-Text-01' : 'GPT-4',
+        createdAt: new Date(),
+      };
     }
 
-    const lines = code.split('\n');
-    const context = lines.slice(Math.max(0, cursorPos.line - 10), cursorPos.line + 5).join('\n');
-
-    const result = await this.completions(
-      `Given this code context (cursor at line ${cursorPos.line}, column ${cursorPos.column}):\n${context}\n\nSuggest the next line(s) to complete the current function. Reply ONLY with the code suggestion, no explanation.`
-    );
-
-    const suggestion = {
-      startLine: cursorPos.line,
-      endLine: cursorPos.line + result.split('\n').length - 1,
-      suggestion: result.trim(),
-      confidence: 0.7,
-      model: process.env.MINIMAX_API_KEY ? 'MiniMax-Text-01' : 'GPT-4',
-      createdAt: new Date(),
-    };
-
-    this.cache.set(cacheKey, { result: suggestion, expires: Date.now() + 30_000 });
-    return suggestion;
+    this.cache.set(cacheKey, { result, expires: Date.now() + 30_000 });
+    return result;
   }
 
   async explainCode(code: string, userId = 'anon'): Promise<string> {
@@ -102,8 +104,8 @@ export class AIPairProgrammer {
   }
 
   async reviewChanges(docContent: string, diff: any[], userId = 'anon'): Promise<string> {
-    if (!this.completions) return 'AI disabled';
     if (!this.checkRateLimit(userId)) return 'Rate limited';
+    if (!this.completions) return 'AI disabled';
 
     return this.completions(`Review these code changes and give concise feedback (max 3 points):\n${JSON.stringify(diff.slice(0, 10))}`);
   }
