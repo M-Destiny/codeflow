@@ -83,6 +83,13 @@ export class SignalServer {
 
         const sanitizedRoomId = sanitizeRoomId(roomId);
         const sanitizedUserName = sanitizeUserName(userName);
+        
+        // Reject if sanitization modified the input (invalid characters present)
+        if (sanitizedRoomId !== roomId || sanitizedUserName !== userName) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid room ID or user name (contains invalid characters)' });
+          return;
+        }
+        
         if (!sanitizedRoomId || !sanitizedUserName) {
           socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid room ID or user name' });
           return;

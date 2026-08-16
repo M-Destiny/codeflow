@@ -74,23 +74,35 @@ describe('SignalServer Integration', () => {
         new Promise((resolve) => clientSocket.once('user:join', resolve)),
       ]);
       
-      expect(selfData.userName).toBe('Bob');
-      expect(joinData.userName).toBe('Bob');
+      expect((selfData as any).userName).toBe('Bob');
+      expect((joinData as any).userName).toBe('Bob');
       client2.close();
     });
 
     it('should reject invalid room ID', async () => {
-      const errorPromise = new Promise((resolve) => clientSocket.once('error', resolve));
+      const errorPromise = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout waiting for error')), 1000);
+        clientSocket.once('error', (data: any) => {
+          clearTimeout(timeout);
+          resolve(data);
+        });
+      });
       clientSocket.emit('room:join', { roomId: 'room@#$%', userName: 'Alice' });
       const error = await errorPromise;
-      expect(error.code).toBe('INVALID_INPUT');
+      expect((error as any).code).toBe('INVALID_INPUT');
     });
 
     it('should reject invalid user name', async () => {
-      const errorPromise = new Promise((resolve) => clientSocket.once('error', resolve));
+      const errorPromise = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout waiting for error')), 1000);
+        clientSocket.once('error', (data: any) => {
+          clearTimeout(timeout);
+          resolve(data);
+        });
+      });
       clientSocket.emit('room:join', { roomId: 'valid-room', userName: '<script>alert(1)</script>' });
       const error = await errorPromise;
-      expect(error.code).toBe('INVALID_INPUT');
+      expect((error as any).code).toBe('INVALID_INPUT');
     });
 
     it('should enforce rate limit on room:join', async () => {
@@ -148,11 +160,11 @@ describe('SignalServer Integration', () => {
       clientSocket.emit('cursor:update', { line: 10, column: 5 });
       
       const data = await cursorPromise;
-      expect(data.userId).toBeDefined();
-      expect(data.userName).toBe('Alice');
-      expect(data.line).toBe(10);
-      expect(data.column).toBe(5);
-      expect(data.color).toBeDefined();
+      expect((data as any).userId).toBeDefined();
+      expect((data as any).userName).toBe('Alice');
+      expect((data as any).line).toBe(10);
+      expect((data as any).column).toBe(5);
+      expect((data as any).color).toBeDefined();
       client2.close();
     });
 
@@ -201,11 +213,11 @@ describe('SignalServer Integration', () => {
       clientSocket.emit('operation', { type: 'insert', pos: 0, text: 'Hello' });
       
       const data = await opPromise;
-      expect(data.type).toBe('insert');
-      expect(data.pos).toBe(0);
-      expect(data.text).toBe('Hello');
-      expect(data.userId).toBeDefined();
-      expect(data.socketId).toBeDefined();
+      expect((data as any).type).toBe('insert');
+      expect((data as any).pos).toBe(0);
+      expect((data as any).text).toBe('Hello');
+      expect((data as any).userId).toBeDefined();
+      expect((data as any).socketId).toBeDefined();
       client2.close();
     });
 
@@ -221,9 +233,9 @@ describe('SignalServer Integration', () => {
       clientSocket.emit('operation', { type: 'delete', pos: 5, length: 3 });
       
       const data = await opPromise;
-      expect(data.type).toBe('delete');
-      expect(data.pos).toBe(5);
-      expect(data.length).toBe(3);
+      expect((data as any).type).toBe('delete');
+      expect((data as any).pos).toBe(5);
+      expect((data as any).length).toBe(3);
       client2.close();
     });
 
@@ -254,11 +266,11 @@ describe('SignalServer Integration', () => {
       clientSocket.emit('chat:message', { text: 'Hello everyone!' });
       
       const data = await msgPromise;
-      expect(data.userName).toBe('Alice');
-      expect(data.text).toBe('Hello everyone!');
-      expect(data.roomId).toBe('chat-room');
-      expect(data.id).toBeDefined();
-      expect(data.timestamp).toBeDefined();
+      expect((data as any).userName).toBe('Alice');
+      expect((data as any).text).toBe('Hello everyone!');
+      expect((data as any).roomId).toBe('chat-room');
+      expect((data as any).id).toBeDefined();
+      expect((data as any).timestamp).toBeDefined();
       client2.close();
     });
 
@@ -274,7 +286,7 @@ describe('SignalServer Integration', () => {
       clientSocket.emit('chat:message', { text: 'Hello\x00World\x1F' });
       
       const data = await msgPromise;
-      expect(data.text).toBe('HelloWorld');
+      expect((data as any).text).toBe('HelloWorld');
       client2.close();
     });
 
@@ -291,7 +303,7 @@ describe('SignalServer Integration', () => {
       clientSocket.emit('chat:message', { text: longMsg });
       
       const data = await msgPromise;
-      expect(data.text.length).toBe(1000);
+      expect((data as any).text.length).toBe(1000);
       client2.close();
     });
   });
@@ -315,8 +327,8 @@ describe('SignalServer Integration', () => {
       clientSocket.emit('rtc:offer', { to: bobSocketId, offer });
       
       const data = await offerPromise;
-      expect(data.from).toBe(clientSocket.id);
-      expect(data.offer).toEqual({ type: 'offer', sdp: 'fake-sdp' });
+      expect((data as any).from).toBe(clientSocket.id);
+      expect((data as any).offer).toEqual({ type: 'offer', sdp: 'fake-sdp' });
       client2.close();
     });
 
@@ -334,8 +346,8 @@ describe('SignalServer Integration', () => {
       clientSocket.emit('rtc:answer', { to: bobSocketId, answer });
       
       const data = await answerPromise;
-      expect(data.from).toBe(clientSocket.id);
-      expect(data.answer).toEqual({ type: 'answer', sdp: 'fake-sdp-answer' });
+      expect((data as any).from).toBe(clientSocket.id);
+      expect((data as any).answer).toEqual({ type: 'answer', sdp: 'fake-sdp-answer' });
       client2.close();
     });
 
@@ -353,8 +365,8 @@ describe('SignalServer Integration', () => {
       clientSocket.emit('rtc:ice', { to: bobSocketId, candidate });
       
       const data = await icePromise;
-      expect(data.from).toBe(clientSocket.id);
-      expect(data.candidate).toEqual({ candidate: 'candidate:1 1 UDP 2122260223...', sdpMid: '0', sdpMLineIndex: 0 });
+      expect((data as any).from).toBe(clientSocket.id);
+      expect((data as any).candidate).toEqual({ candidate: 'candidate:1 1 UDP 2122260223...', sdpMid: '0', sdpMLineIndex: 0 });
       client2.close();
     });
 
@@ -371,7 +383,7 @@ describe('SignalServer Integration', () => {
       clientSocket.emit('rtc:restart', { to: bobSocketId });
       
       const data = await restartPromise;
-      expect(data.from).toBe(clientSocket.id);
+      expect((data as any).from).toBe(clientSocket.id);
       client2.close();
     });
   });

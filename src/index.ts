@@ -38,21 +38,9 @@ app.get('/api/health', (_, res) => res.json({
   memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
 }));
 
-// Metrics endpoint
+// Metrics endpoint (Prometheus format)
 app.get('/metrics', (_, res) => {
-  const m = metrics.getAll();
-  const lines = [
-    `# HELP codeflow_connections_total Total connections`,
-    `# TYPE codeflow_connections_total counter`,
-    `codeflow_connections_total ${m.counters.connections_total ?? 0}`,
-    `# HELP codeflow_active_connections Active connections`,
-    `# TYPE codeflow_active_connections gauge`,
-    `codeflow_active_connections ${m.gauges.connections_active ?? 0}`,
-    `# HELP codeflow_rooms_total Total room joins`,
-    `# TYPE codeflow_rooms_total counter`,
-    `codeflow_rooms_total ${m.counters.room_joins_total ?? 0}`,
-  ];
-  res.type('text/plain').send(lines.join('\n'));
+  res.type('text/plain').send(metrics.getPrometheusMetrics());
 });
 
 // REST docs API
