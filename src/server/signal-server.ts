@@ -12,9 +12,30 @@ const USER_COLORS = [
 const RATE_LIMIT_WINDOW_MS = 1000;
 const MAX_EVENTS_PER_WINDOW = 30;
 
+// WebRTC ICE configuration
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  // TURN servers can be added via environment variable
+  ...(process.env.TURN_URLS ? process.env.TURN_URLS.split(',').map(url => {
+    const [urls, username, credential] = url.split('|');
+    return { urls, username, credential };
+  }) : []),
+];
+
 interface RateLimitEntry {
   count: number;
   windowStart: number;
+}
+
+interface PeerConnectionState {
+  socketId: string;
+  userId: string;
+  roomId: string;
+  iceConnectionState: RTCIceConnectionState;
+  lastActivity: number;
+  iceRestartCount: number;
 }
 
 export class SignalServer {
@@ -24,6 +45,9 @@ export class SignalServer {
   private colorIndex = 0;
   private events = new Map<string, any[]>();
   private rateLimits = new Map<string, RateLimitEntry>();
+  private peerConnections = new Map<string, PeerConnectionState>(); // key: `${roomId}:${socketId}`
+  private readonly MAX_ICE_RESTARTS = 3;
+  private readonly ICE_RESTART_COOLDOWN_MS = 5000;
 
   constructor(io: SocketServer) {
     this.io = io;
