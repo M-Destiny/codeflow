@@ -8,12 +8,12 @@
  */
 export function sanitizeHtml(input: string): string {
   return input
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
-    .replace(/"/g, '&#x22;')
-    .replace(/'/g, ''')
-    .replace(/\//g, '&#x2F;');
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, "&#x22;")
+    .replace(/'/g, "\u0027")
+    .replace(/\//g, "&#x2F;");
 }
 
 /**
@@ -21,7 +21,7 @@ export function sanitizeHtml(input: string): string {
  */
 export function sanitizeChatMessage(input: string): string {
   // Remove null bytes and control characters (except newline/tab)
-  let sanitized = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  let sanitized = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
   // Limit length
   sanitized = sanitized.slice(0, 1000);
   // Trim
@@ -32,14 +32,14 @@ export function sanitizeChatMessage(input: string): string {
  * Sanitize room ID - alphanumeric and hyphens only
  */
 export function sanitizeRoomId(input: string): string {
-  return input.replace(/[^a-zA-Z0-9-_]/g, '').slice(0, 64);
+  return input.replace(/[^a-zA-Z0-9-_]/g, "").slice(0, 64);
 }
 
 /**
  * Sanitize user name - alphanumeric, spaces, hyphens, underscores
  */
 export function sanitizeUserName(input: string): string {
-  return input.replace(/[^a-zA-Z0-9\s\-_]/g, '').slice(0, 32);
+  return input.replace(/[^a-zA-Z0-9\s\-_]/g, "").slice(0, 32);
 }
 
 /**
@@ -54,9 +54,9 @@ export function sanitizeCodeForAI(input: string): string {
  * Validate and sanitize operation positions
  */
 export function sanitizeOperation(op: { type: string; pos: number; text?: string; length?: number }): typeof op | null {
-  if (!op || typeof op.pos !== 'number' || op.pos < 0) return null;
-  if (op.type === 'insert' && (typeof op.text !== 'string' || op.text.length > 10000)) return null;
-  if (op.type === 'delete' && (typeof op.length !== 'number' || op.length <= 0 || op.length > 10000)) return null;
-  if (op.type !== 'insert' && op.type !== 'delete' && op.type !== 'retain') return null;
+  if (!op || typeof op.pos !== "number" || op.pos < 0) return null;
+  if (op.type === "insert" && (typeof op.text !== "string" || op.text.length > 10000)) return null;
+  if (op.type === "delete" && (typeof op.length !== "number" || op.length <= 0 || op.length > 10000)) return null;
+  if (op.type !== "insert" && op.type !== "delete" && op.type !== "retain") return null;
   return op;
 }
