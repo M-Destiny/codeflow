@@ -125,6 +125,14 @@ export class SignalServer {
         if (typeof to === 'string' && candidate) this.io.to(to).emit('rtc:ice', { from: socket.id, candidate });
       });
 
+      socket.on('rtc:restart', ({ to }: { to: string }) => {
+        if (!this.checkRateLimit(socket.id)) return;
+        if (typeof to === 'string') {
+          // Signal ICE restart to remote peer
+          this.io.to(to).emit('rtc:restart', { from: socket.id });
+        }
+      });
+
       socket.on('disconnect', () => {
         const info = this.userRooms.get(socket.id);
         if (!info) return;

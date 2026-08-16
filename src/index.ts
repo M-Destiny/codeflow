@@ -16,6 +16,9 @@ const io = new Server(httpServer, {
   transports: ['websocket', 'polling'],
   pingTimeout: 20000,
   pingInterval: 25000,
+  perMessageDeflate: {
+    threshold: 1024, // Compress messages larger than 1KB
+  },
 });
 
 const docs = new DocManager();

@@ -83,6 +83,7 @@ export enum RoomEvent {
   RTC_OFFER = 'rtc:offer',
   RTC_ANSWER = 'rtc:answer',
   RTC_ICE = 'rtc:ice',
+  RTC_RESTART = 'rtc:restart',
 }
 
 export enum WSEvent {
