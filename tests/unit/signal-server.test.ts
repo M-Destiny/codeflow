@@ -175,11 +175,11 @@ describe('Rate Limiting Logic', () => {
     for (let i = 0; i < MAX_EVENTS_PER_WINDOW; i++) {
       checkRateLimit(rateLimits, 'socket-1');
     }
-    
+
     // Manually expire the window
     const entry = rateLimits.get('socket-1')!;
     entry.windowStart = Date.now() - RATE_LIMIT_WINDOW_MS - 1;
-    
+
     expect(checkRateLimit(rateLimits, 'socket-1')).toBe(true);
     expect(rateLimits.get('socket-1')!.count).toBe(1);
   });
@@ -241,10 +241,10 @@ describe('AI Rate Limiting', () => {
     for (let i = 0; i < RATE_LIMIT; i++) {
       checkRateLimit(rateLimits, 'user-3');
     }
-    
+
     const entry = rateLimits.get('user-3')!;
     entry.resetAt = Date.now() - 1000;
-    
+
     expect(checkRateLimit(rateLimits, 'user-3')).toBe(true);
     expect(rateLimits.get('user-3')!.count).toBe(1);
   });
