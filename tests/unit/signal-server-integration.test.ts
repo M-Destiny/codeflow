@@ -10,21 +10,26 @@ describe('SignalServer Integration', () => {
   let signal: SignalServer;
   let clientSocket: any;
 
-  beforeEach((done: () => void) => {
+  beforeEach(async () => {
     httpServer = createServer();
     io = new SocketServer(httpServer, {
       cors: { origin: '*', methods: ['GET', 'POST'] },
     });
     signal = new SignalServer(io);
-
-    httpServer.listen(0, () => {
-      const port = (httpServer.address() as any).port;
-      const { io: clientIO } = require('socket.io-client');
-      clientSocket = clientIO(`http://localhost:${port}`, {
-        transports: ['websocket'],
-        forceNew: true,
+    await new Promise<void>((resolve) => {
+      httpServer.listen(0, () => {
+        const { io: clientIO } = require('socket.io-client');
+        const port = (httpServer.address() as any).port;
+        clientSocket = clientIO(`http://localhost:${port}`, {
+          transports: ['websocket'],
+          forceNew: true,
+        });
+        clientSocket.on('connect', resolve);
+        clientSocket.on('connect_error', (err: any) => {
+          console.error('Connection error:', err);
+          resolve();
+        });
       });
-      clientSocket.on('connect', done);
     });
   });
 
@@ -493,15 +498,21 @@ describe('SignalServer Sanitization Integration', () => {
   let signal: SignalServer;
   let clientSocket: any;
 
-  beforeEach((done: () => void) => {
+  beforeEach(async () => {
     httpServer = createServer();
     io = new SocketServer(httpServer, { cors: { origin: '*' } });
     signal = new SignalServer(io);
-    httpServer.listen(0, () => {
-      const { io: clientIO } = require('socket.io-client');
-      const port = (httpServer.address() as any).port;
-      clientSocket = clientIO(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
-      clientSocket.on('connect', done);
+    await new Promise<void>((resolve) => {
+      httpServer.listen(0, () => {
+        const { io: clientIO } = require('socket.io-client');
+        const port = (httpServer.address() as any).port;
+        clientSocket = clientIO(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
+        clientSocket.on('connect', resolve);
+        clientSocket.on('connect_error', (err: any) => {
+          console.error('Connection error:', err);
+          resolve();
+        });
+      });
     });
   });
 
