@@ -61,16 +61,17 @@ export class AIPairProgrammer {
   }
 
   async suggestCompletion(code: string, cursorPos: { line: number; column: number }, userId = 'anon'): Promise<any> {
+    // Check rate limit first, before AI availability
+    if (!this.checkRateLimit(userId)) {
+      return { error: 'Rate limited. Try again in a minute.' };
+    }
+
     const cacheKey = `suggest:${code.slice(-100)}:${cursorPos.line}:${cursorPos.column}`;
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expires > Date.now()) return cached.result;
 
     if (!this.completions) {
       return { startLine: cursorPos.line, endLine: cursorPos.line, suggestion: '// Configure OPENAI_API_KEY or MINIMAX_API_KEY to enable AI suggestions', confidence: 0 };
-    }
-
-    if (!this.checkRateLimit(userId)) {
-      return { error: 'Rate limited. Try again in a minute.' };
     }
 
     const lines = code.split('\n');
@@ -94,8 +95,8 @@ export class AIPairProgrammer {
   }
 
   async explainCode(code: string, userId = 'anon'): Promise<string> {
-    if (!this.completions) return 'AI disabled: set OPENAI_API_KEY or MINIMAX_API_KEY';
     if (!this.checkRateLimit(userId)) return 'Rate limited';
+    if (!this.completions) return 'AI disabled: set OPENAI_API_KEY or MINIMAX_API_KEY';
 
     return this.completions(`Explain this code concisely:\n${code.slice(0, 500)}`);
   }
