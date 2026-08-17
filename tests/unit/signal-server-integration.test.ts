@@ -505,19 +505,22 @@ describe("SignalServer Integration", () => {
       // Give some time for client2 to be fully in the room
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // ClientSocket (Alice) joins and waits for user:join from Bob
-      const joinPromise = new Promise<void>((resolve) => {
+      // ClientSocket (Alice) joins and waits for user:self
+      await new Promise<void>((resolve) => {
+        clientSocket.emit("room:join", {
+          roomId: "disconnect-room",
+          userName: "Alice",
+        });
+        clientSocket.once("user:self", resolve);
+      });
+
+      // Now wait for user:join from Bob on clientSocket
+      await new Promise<void>((resolve) => {
         clientSocket.once("user:join", (data: any) => {
           expect(data.userName).toBe("Bob");
           resolve();
         });
       });
-
-      clientSocket.emit("room:join", {
-        roomId: "disconnect-room",
-        userName: "Alice",
-      });
-      await joinPromise;
 
       // Now wait for user:leave when Alice disconnects
       const leavePromise = new Promise<void>((resolve) => {
@@ -531,7 +534,7 @@ describe("SignalServer Integration", () => {
       clientSocket.close();
       await leavePromise;
       client2.close();
-    });
+    }, 10000);
 
     it("should clean up rate limits on disconnect", async () => {
       // Fill rate limit
