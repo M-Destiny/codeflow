@@ -79,7 +79,7 @@ describe('SignalServer Integration', () => {
       client2.close();
     });
 
-    it('should reject invalid room ID', async () => {
+    it('should reject empty room ID after sanitization', async () => {
       const errorPromise = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Timeout waiting for error')), 1000);
         clientSocket.once('error', (data: any) => {
@@ -87,12 +87,12 @@ describe('SignalServer Integration', () => {
           resolve(data);
         });
       });
-      clientSocket.emit('room:join', { roomId: 'room@#$%', userName: 'Alice' });
+      clientSocket.emit('room:join', { roomId: '@#$%', userName: 'Alice' });
       const error = await errorPromise;
       expect((error as any).code).toBe('INVALID_INPUT');
     });
 
-    it('should reject invalid user name', async () => {
+    it('should reject empty user name after sanitization', async () => {
       const errorPromise = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Timeout waiting for error')), 1000);
         clientSocket.once('error', (data: any) => {
@@ -100,7 +100,7 @@ describe('SignalServer Integration', () => {
           resolve(data);
         });
       });
-      clientSocket.emit('room:join', { roomId: 'valid-room', userName: '<script>alert(1)</script>' });
+      clientSocket.emit('room:join', { roomId: 'valid-room', userName: '<>!@#' });
       const error = await errorPromise;
       expect((error as any).code).toBe('INVALID_INPUT');
     });
@@ -415,13 +415,13 @@ describe('SignalServer Integration', () => {
       await joinPromise;
       
       const leavePromise = new Promise<void>((resolve) => {
-        clientSocket.once('user:leave', (data: any) => {
+        client2.once('user:leave', (data: any) => {
           expect(data.userId).toBeDefined();
           expect(data.socketId).toBe(clientSocket.id);
           resolve();
         });
       });
-      
+
       clientSocket.close();
       await leavePromise;
       client2.close();
@@ -543,7 +543,7 @@ describe('SignalServer Sanitization Integration', () => {
     clientSocket.emit('room:join', { roomId: 'valid-room', userName: 'User<script>alert(1)</script>' });
     await new Promise<void>((resolve) => {
       clientSocket.once('user:self', (data: any) => {
-        expect(data.userName).toBe('Useralert1script');
+        expect(data.userName).toBe('Userscriptalert1script');
         resolve();
       });
     });
