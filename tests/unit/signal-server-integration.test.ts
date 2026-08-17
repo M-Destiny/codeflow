@@ -389,55 +389,64 @@ describe('SignalServer Integration', () => {
   });
 
   describe('Disconnect', () => {
-    it('should broadcast user:leave when user disconnects', (done: () => void) => {
+    it('should broadcast user:leave when user disconnects', async () => {
       const { io: clientIO } = require('socket.io-client');
       const port = (httpServer.address() as any).port;
       
       const client2 = clientIO(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
       
-      client2.on('connect', () => {
+      await new Promise<void>((resolve) => {
+        client2.on('connect', resolve);
+      });
+      
+      await new Promise<void>((resolve) => {
         client2.emit('room:join', { roomId: 'disconnect-room', userName: 'Bob' });
+        client2.once('user:self', resolve);
       });
       
-      client2.on('user:self', () => {
-        clientSocket.emit('room:join', { roomId: 'disconnect-room', userName: 'Alice' });
-      });
-      
-      clientSocket.on('user:self', () => {
-        client2.on('user:join', (data: any) => {
+      const joinPromise = new Promise<void>((resolve) => {
+        clientSocket.once('user:join', (data: any) => {
           expect(data.userName).toBe('Alice');
+          resolve();
         });
-        
-        clientSocket.on('user:leave', (data: any) => {
+      });
+      
+      clientSocket.emit('room:join', { roomId: 'disconnect-room', userName: 'Alice' });
+      await joinPromise;
+      
+      const leavePromise = new Promise<void>((resolve) => {
+        clientSocket.once('user:leave', (data: any) => {
           expect(data.userId).toBeDefined();
           expect(data.socketId).toBe(clientSocket.id);
-          client2.close();
-          done();
+          resolve();
         });
-        
-        clientSocket.close();
       });
+      
+      clientSocket.close();
+      await leavePromise;
+      client2.close();
     });
 
-    it('should clean up rate limits on disconnect', (done: (err?: Error) => void) => {
+    it('should clean up rate limits on disconnect', async () => {
       // Fill rate limit
       for (let i = 0; i < 35; i++) {
         clientSocket.emit('cursor:update', { line: i, column: i });
       }
       
-      setTimeout(() => {
-        clientSocket.close();
-        
-        // Create new socket with same server - wait for server to be ready
-        const { io: clientIO } = require('socket.io-client');
-        const address = httpServer.address();
-        if (!address) {
-          done(new Error('Server address is null'));
-          return;
-        }
-        const port = (address as any).port;
-        const newSocket = clientIO(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
-        
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      clientSocket.close();
+      
+      // Create new socket with same server - wait for server to be ready
+      const { io: clientIO } = require('socket.io-client');
+      const address = httpServer.address();
+      if (!address) {
+        throw new Error('Server address is null');
+      }
+      const port = (address as any).port;
+      const newSocket = clientIO(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
+      
+      await new Promise<void>((resolve, reject) => {
         newSocket.on('connect', () => {
           newSocket.emit('room:join', { roomId: 'new-room', userName: 'NewUser' });
         });
@@ -446,13 +455,13 @@ describe('SignalServer Integration', () => {
           // Should be able to join (no rate limit from old socket)
           newSocket.emit('cursor:update', { line: 0, column: 0 });
           newSocket.close();
-          done();
+          resolve();
         });
         
         newSocket.on('connect_error', (err: Error) => {
-          done(err);
+          reject(err);
         });
-      }, 100);
+      });
     });
   });
 
@@ -461,25 +470,30 @@ describe('SignalServer Integration', () => {
       expect(signal.getRoomSize('non-existent')).toBe(0);
     });
 
-    it('should track room size after joins', (done: (err?: Error) => void) => {
+    it('should track room size after joins', async () => {
       clientSocket.emit('room:join', { roomId: 'size-room', userName: 'Alice' });
-      clientSocket.on('user:self', () => {
-        expect(signal.getRoomSize('size-room')).toBe(1);
-        
-        const { io: clientIO } = require('socket.io-client');
-        const port = (httpServer.address() as any).port;
-        const client2 = clientIO(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
-        client2.on('connect', () => {
-          client2.emit('room:join', { roomId: 'size-room', userName: 'Bob' });
-        });
-        client2.on('user:self', () => {
-          setTimeout(() => {
-            expect(signal.getRoomSize('size-room')).toBe(2);
-            client2.close();
-            done();
-          }, 50);
-        });
+      await new Promise<void>((resolve) => {
+        clientSocket.once('user:self', resolve);
       });
+      
+      expect(signal.getRoomSize('size-room')).toBe(1);
+      
+      const { io: clientIO } = require('socket.io-client');
+      const port = (httpServer.address() as any).port;
+      const client2 = clientIO(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
+      
+      await new Promise<void>((resolve) => {
+        client2.on('connect', resolve);
+      });
+      
+      await new Promise<void>((resolve) => {
+        client2.emit('room:join', { roomId: 'size-room', userName: 'Bob' });
+        client2.once('user:self', resolve);
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 50));
+      expect(signal.getRoomSize('size-room')).toBe(2);
+      client2.close();
     });
   });
 });
@@ -514,20 +528,24 @@ describe('SignalServer Sanitization Integration', () => {
     httpServer?.close();
   });
 
-  it('should sanitize room ID on join', (done: () => void) => {
+  it('should sanitize room ID on join', async () => {
     clientSocket.emit('room:join', { roomId: 'Room@#$%With!Special*Chars', userName: 'Alice' });
-    clientSocket.on('user:self', (data: any) => {
-      // Room ID should be sanitized to alphanumeric, hyphen, underscore
-      expect(data.userId).toBeDefined();
-      done();
+    await new Promise<void>((resolve) => {
+      clientSocket.once('user:self', (data: any) => {
+        // Room ID should be sanitized to alphanumeric, hyphen, underscore
+        expect(data.userId).toBeDefined();
+        resolve();
+      });
     });
   });
 
-  it('should sanitize user name on join', (done: () => void) => {
+  it('should sanitize user name on join', async () => {
     clientSocket.emit('room:join', { roomId: 'valid-room', userName: 'User<script>alert(1)</script>' });
-    clientSocket.on('user:self', (data: any) => {
-      expect(data.userName).toBe('Useralert1script');
-      done();
+    await new Promise<void>((resolve) => {
+      clientSocket.once('user:self', (data: any) => {
+        expect(data.userName).toBe('Useralert1script');
+        resolve();
+      });
     });
   });
 });

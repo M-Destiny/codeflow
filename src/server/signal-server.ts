@@ -38,6 +38,8 @@ interface PeerConnectionState {
   iceConnectionState: RTCIceConnectionState;
   lastActivity: number;
   iceRestartCount: number;
+  reconnectAttempts: number;
+  lastReconnectAttempt: number;
 }
 
 interface RtcRestartState {
@@ -56,6 +58,8 @@ export class SignalServer {
   private rtcRestartState = new Map<string, RtcRestartState>(); // key: `${roomId}:${socketId}:${targetSocketId}`
   private readonly MAX_ICE_RESTARTS = 3;
   private readonly ICE_RESTART_COOLDOWN_MS = 5000;
+  private readonly MAX_RECONNECT_ATTEMPTS = 3;
+  private readonly RECONNECT_COOLDOWN_MS = 10000;
 
   constructor(io: SocketServer) {
     this.io = io;
@@ -179,15 +183,76 @@ export class SignalServer {
 
       socket.on('rtc:offer', ({ to, offer }: any) => {
         if (!this.checkRateLimit(socket.id)) return;
-        if (typeof to === 'string' && offer) this.io.to(to).emit('rtc:offer', { from: socket.id, offer });
+        if (typeof to === 'string' && offer) {
+          const info = this.userRooms.get(socket.id);
+          if (!info) return;
+          this.io.to(to).emit('rtc:offer', { from: socket.id, offer });
+          
+          // Initialize peer connection state
+          const key = `${info.roomId}:${socket.id}:${to}`;
+          if (!this.peerConnections.has(key)) {
+            this.peerConnections.set(key, {
+              socketId: socket.id,
+              userId: info.userId,
+              roomId: info.roomId,
+              iceConnectionState: 'new',
+              lastActivity: Date.now(),
+              iceRestartCount: 0,
+              reconnectAttempts: 0,
+              lastReconnectAttempt: 0,
+            });
+          }
+        }
       });
       socket.on('rtc:answer', ({ to, answer }: any) => {
         if (!this.checkRateLimit(socket.id)) return;
-        if (typeof to === 'string' && answer) this.io.to(to).emit('rtc:answer', { from: socket.id, answer });
+        if (typeof to === 'string' && answer) {
+          const info = this.userRooms.get(socket.id);
+          if (!info) return;
+          this.io.to(to).emit('rtc:answer', { from: socket.id, answer });
+          
+          // Initialize peer connection state
+          const key = `${info.roomId}:${socket.id}:${to}`;
+          if (!this.peerConnections.has(key)) {
+            this.peerConnections.set(key, {
+              socketId: socket.id,
+              userId: info.userId,
+              roomId: info.roomId,
+              iceConnectionState: 'new',
+              lastActivity: Date.now(),
+              iceRestartCount: 0,
+              reconnectAttempts: 0,
+              lastReconnectAttempt: 0,
+            });
+          }
+        }
       });
       socket.on('rtc:ice', ({ to, candidate }: any) => {
         if (!this.checkRateLimit(socket.id)) return;
         if (typeof to === 'string' && candidate) this.io.to(to).emit('rtc:ice', { from: socket.id, candidate });
+      });
+
+      socket.on('rtc:ice-state', ({ to, state }: { to: string; state: RTCIceConnectionState }) => {
+        if (!this.checkRateLimit(socket.id)) return;
+        if (typeof to === 'string' && state) {
+          const info = this.userRooms.get(socket.id);
+          if (!info) return;
+          
+          this.io.to(to).emit('rtc:ice-state', { from: socket.id, state });
+          
+          // Track connection state for reconnection logic
+          const key = `${info.roomId}:${socket.id}:${to}`;
+          const peerState = this.peerConnections.get(key);
+          if (peerState) {
+            peerState.iceConnectionState = state;
+            peerState.lastActivity = Date.now();
+            
+            // If connection failed or disconnected, allow reconnection attempts
+            if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+              this.handleConnectionFailure(socket, to, info.roomId);
+            }
+          }
+        }
       });
 
       socket.on('rtc:restart', ({ to }: { to: string }) => {
@@ -206,9 +271,68 @@ export class SignalServer {
         this.rooms.get(roomId)?.delete(socket.id);
         this.userRooms.delete(socket.id);
         this.rateLimits.delete(socket.id);
+        this.cleanupPeerConnections(socket.id);
         socket.to(roomId).emit('user:leave', { userId, socketId: socket.id });
       });
     });
+  }
+
+  private handleConnectionFailure(socket: Socket, targetSocketId: string, roomId: string) {
+    const key = `${roomId}:${socket.id}:${targetSocketId}`;
+    const peerState = this.peerConnections.get(key);
+    if (!peerState) return;
+
+    const now = Date.now();
+    
+    // Check if we've exceeded max reconnect attempts
+    if (peerState.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
+      console.log(`Max reconnect attempts reached for ${key}`);
+      return;
+    }
+
+    // Check cooldown
+    if (now - peerState.lastReconnectAttempt < this.RECONNECT_COOLDOWN_MS) {
+      return;
+    }
+
+    // Increment and schedule reconnection
+    peerState.reconnectAttempts++;
+    peerState.lastReconnectAttempt = now;
+
+    // Signal the remote peer to attempt reconnection
+    this.io.to(targetSocketId).emit('rtc:reconnect', { 
+      from: socket.id, 
+      attempt: peerState.reconnectAttempts 
+    });
+    
+    // Also trigger ICE restart as fallback
+    if (peerState.reconnectAttempts >= 2) {
+      const restartKey = `${roomId}:${socket.id}:${targetSocketId}`;
+      const restartState = this.rtcRestartState.get(restartKey) || { lastRestartAt: 0, restartCount: 0 };
+      const timeSinceLastRestart = now - restartState.lastRestartAt;
+      
+      if (restartState.restartCount < this.MAX_ICE_RESTARTS && timeSinceLastRestart >= this.ICE_RESTART_COOLDOWN_MS) {
+        restartState.restartCount++;
+        restartState.lastRestartAt = now;
+        this.rtcRestartState.set(restartKey, restartState);
+        this.io.to(targetSocketId).emit('rtc:restart', { from: socket.id });
+      }
+    }
+  }
+
+  private cleanupPeerConnections(socketId: string) {
+    // Clean up peer connection state for disconnected socket
+    for (const [key, state] of this.peerConnections.entries()) {
+      if (key.startsWith(`${state.roomId}:${socketId}:`) || key.endsWith(`:${socketId}`)) {
+        this.peerConnections.delete(key);
+      }
+    }
+    // Clean up restart state
+    for (const key of this.rtcRestartState.keys()) {
+      if (key.includes(`:${socketId}:`) || key.endsWith(`:${socketId}`)) {
+        this.rtcRestartState.delete(key);
+      }
+    }
   }
 
   getRoomSize(roomId: string): number {

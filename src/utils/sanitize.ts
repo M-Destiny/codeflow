@@ -12,7 +12,7 @@ export function sanitizeHtml(input: string): string {
     .replace(/</g, "<")
     .replace(/>/g, ">")
     .replace(/"/g, "&#x22;")
-    .replace(/'/g, "\u0027")
+    .replace(/'/g, "'")
     .replace(/\//g, "&#x2F;");
 }
 
