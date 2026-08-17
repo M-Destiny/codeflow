@@ -419,7 +419,7 @@ describe('SignalServer Integration', () => {
       });
     });
 
-    it('should clean up rate limits on disconnect', (done: () => void) => {
+    it('should clean up rate limits on disconnect', (done: (err?: Error) => void) => {
       // Fill rate limit
       for (let i = 0; i < 35; i++) {
         clientSocket.emit('cursor:update', { line: i, column: i });
