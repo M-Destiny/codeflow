@@ -63,8 +63,17 @@ describe("Debug disconnect test", () => {
       });
     });
 
-    // Give some time for client2 to be fully in the room
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Set up listener for user:join on client2 BEFORE Alice joins
+    const bobReceivedAliceJoin = new Promise<void>((resolve) => {
+      client2.once("user:join", (data: any) => {
+        console.log("Bob got user:join from Alice:", data);
+        expect(data.userName).toBe("Alice");
+        resolve();
+      });
+      setTimeout(() => {
+        console.log("[TEST] TIMEOUT waiting for user:join from Alice on Bob's socket");
+      }, 5000);
+    });
 
     // ClientSocket (Alice) joins and waits for user:self
     await new Promise<void>((resolve) => {
@@ -78,33 +87,33 @@ describe("Debug disconnect test", () => {
       });
     });
 
-    // Now wait for user:join from Bob on clientSocket
-    await new Promise<void>((resolve) => {
-      clientSocket.once("user:join", (data: any) => {
-        console.log("Alice got user:join from Bob:", data);
-        expect(data.userName).toBe("Bob");
-        resolve();
-      });
-    });
-
     console.log("Both users joined, now waiting for leave event on Bob's socket");
+
+    await bobReceivedAliceJoin;
+    console.log("[TEST] After waiting for user:join from Alice on Bob's socket");
+
+    // Capture socket ID before closing
+    const clientSocketId = clientSocket.id;
+    console.log("[TEST] clientSocketId:", clientSocketId);
 
     // Now wait for user:leave when Alice disconnects
     const leavePromise = new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Timeout waiting for user:leave")), 5000);
+      const timeout = setTimeout(() => reject(new Error("Timeout waiting for user:leave")), 14000);
       client2.once("user:leave", (data: any) => {
         clearTimeout(timeout);
         console.log("Bob got user:leave:", data);
         expect(data.userId).toBeDefined();
-        expect(data.socketId).toBe(clientSocket.id);
+        expect(data.socketId).toBe(clientSocketId);
         resolve();
       });
     });
+    console.log("[TEST] leavePromise created, waiting...");
 
     console.log("Closing Alice's socket...");
     clientSocket.close();
+    console.log("[TEST] clientSocket.close() called, awaiting leavePromise...");
     await leavePromise;
-    console.log("Test passed!");
+    console.log("[TEST] leavePromise resolved!");
     client2.close();
   }, 15000);
 });

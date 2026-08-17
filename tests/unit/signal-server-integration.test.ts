@@ -505,6 +505,18 @@ describe("SignalServer Integration", () => {
       // Give some time for client2 to be fully in the room
       await new Promise((resolve) => setTimeout(resolve, 50));
 
+      // Set up listener for user:join on client2 BEFORE Alice joins
+      const bobReceivedAliceJoin = new Promise<void>((resolve) => {
+        client2.once("user:join", (data: any) => {
+          console.log("[TEST] Bob got user:join from Alice:", data);
+          expect(data.userName).toBe("Alice");
+          resolve();
+        });
+        setTimeout(() => {
+          console.log("[TEST] TIMEOUT waiting for user:join from Alice on Bob's socket");
+        }, 5000);
+      });
+
       // ClientSocket (Alice) joins and waits for user:self
       await new Promise<void>((resolve) => {
         clientSocket.emit("room:join", {
@@ -514,14 +526,10 @@ describe("SignalServer Integration", () => {
         clientSocket.once("user:self", resolve);
       });
 
-      // Now wait for user:join from Bob on clientSocket
-      await new Promise<void>((resolve) => {
-        clientSocket.once("user:join", (data: any) => {
-          expect(data.userName).toBe("Bob");
-          resolve();
-        });
-      });
-      console.log("[TEST] After waiting for user:join from Bob");
+      console.log("[TEST] Alice joined, now waiting for Bob to receive user:join for Alice");
+
+      await bobReceivedAliceJoin;
+      console.log("[TEST] After waiting for user:join from Alice on Bob's socket");
 
       // Capture socket ID before closing
       const clientSocketId = clientSocket.id;
