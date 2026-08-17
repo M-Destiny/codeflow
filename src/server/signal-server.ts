@@ -259,14 +259,20 @@ export class SignalServer {
       });
 
       socket.on('disconnect', () => {
+        console.log(`[DEBUG] Disconnect event for socket ${socket.id}`);
         const info = this.userRooms.get(socket.id);
-        if (!info) return;
+        if (!info) {
+          console.log(`[DEBUG] No userRooms info for socket ${socket.id}`);
+          return;
+        }
         const { roomId, userId } = info;
+        console.log(`[DEBUG] User ${userId} leaving room ${roomId}`);
         socket.leave(roomId);
         this.rooms.get(roomId)?.delete(socket.id);
         this.userRooms.delete(socket.id);
         this.rateLimits.delete(socket.id);
         this.cleanupPeerConnections(socket.id);
+        console.log(`[DEBUG] Emitting user:leave to room ${roomId} for user ${userId}`);
         socket.to(roomId).emit('user:leave', { userId, socketId: socket.id });
       });
     });
