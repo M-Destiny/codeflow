@@ -428,9 +428,14 @@ describe('SignalServer Integration', () => {
       setTimeout(() => {
         clientSocket.close();
         
-        // Create new socket with same server
+        // Create new socket with same server - wait for server to be ready
         const { io: clientIO } = require('socket.io-client');
-        const port = (httpServer.address() as any).port;
+        const address = httpServer.address();
+        if (!address) {
+          done(new Error('Server address is null'));
+          return;
+        }
+        const port = (address as any).port;
         const newSocket = clientIO(`http://localhost:${port}`, { transports: ['websocket'], forceNew: true });
         
         newSocket.on('connect', () => {
@@ -442,6 +447,10 @@ describe('SignalServer Integration', () => {
           newSocket.emit('cursor:update', { line: 0, column: 0 });
           newSocket.close();
           done();
+        });
+        
+        newSocket.on('connect_error', (err: Error) => {
+          done(err);
         });
       }, 100);
     });
