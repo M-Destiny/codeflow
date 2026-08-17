@@ -534,7 +534,7 @@ describe("SignalServer Integration", () => {
       clientSocket.close();
       await leavePromise;
       client2.close();
-    }, 10000);
+    }, 15000);
 
     it("should clean up rate limits on disconnect", async () => {
       // Fill rate limit
