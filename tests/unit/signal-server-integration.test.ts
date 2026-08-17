@@ -521,20 +521,32 @@ describe("SignalServer Integration", () => {
           resolve();
         });
       });
+      console.log("[TEST] After waiting for user:join from Bob");
+
+      // Capture socket ID before closing
+      const clientSocketId = clientSocket.id;
+      console.log("[TEST] clientSocketId:", clientSocketId);
 
       // Now wait for user:leave when Alice disconnects
-      const leavePromise = new Promise<void>((resolve) => {
+      const leavePromise = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Timeout waiting for user:leave")), 14000);
         client2.once("user:leave", (data: any) => {
+          clearTimeout(timeout);
+          console.log("[TEST] Bob got user:leave:", data);
           expect(data.userId).toBeDefined();
-          expect(data.socketId).toBe(clientSocket.id);
+          expect(data.socketId).toBe(clientSocketId);
           resolve();
         });
       });
+      console.log("[TEST] leavePromise created, waiting...");
 
+      console.log("[TEST] Closing Alice's socket...");
       clientSocket.close();
+      console.log("[TEST] clientSocket.close() called, awaiting leavePromise...");
       await leavePromise;
+      console.log("[TEST] leavePromise resolved!");
       client2.close();
-    }, 15000);
+    }, 30000);
 
     it("should clean up rate limits on disconnect", async () => {
       // Fill rate limit

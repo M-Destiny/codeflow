@@ -267,13 +267,14 @@ export class SignalServer {
         }
         const { roomId, userId } = info;
         console.log(`[DEBUG] User ${userId} leaving room ${roomId}`);
+        // Emit user:leave BEFORE leaving the room, otherwise socket.to(roomId) won't include other members
+        socket.to(roomId).emit('user:leave', { userId, socketId: socket.id });
+        console.log(`[DEBUG] Emitted user:leave to room ${roomId} for user ${userId}`);
         socket.leave(roomId);
         this.rooms.get(roomId)?.delete(socket.id);
         this.userRooms.delete(socket.id);
         this.rateLimits.delete(socket.id);
         this.cleanupPeerConnections(socket.id);
-        console.log(`[DEBUG] Emitting user:leave to room ${roomId} for user ${userId}`);
-        socket.to(roomId).emit('user:leave', { userId, socketId: socket.id });
       });
     });
   }
