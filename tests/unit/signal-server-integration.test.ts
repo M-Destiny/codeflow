@@ -461,7 +461,7 @@ describe('SignalServer Integration', () => {
       expect(signal.getRoomSize('non-existent')).toBe(0);
     });
 
-    it('should track room size after joins', (done: () => void) => {
+    it('should track room size after joins', (done: (err?: Error) => void) => {
       clientSocket.emit('room:join', { roomId: 'size-room', userName: 'Alice' });
       clientSocket.on('user:self', () => {
         expect(signal.getRoomSize('size-room')).toBe(1);
