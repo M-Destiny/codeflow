@@ -1,4 +1,6 @@
 import { Server as SocketServer, Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { createClient } from 'redis';
 import { v4 as uuid } from 'uuid';
 import { sanitizeRoomId, sanitizeUserName, sanitizeChatMessage, sanitizeOperation } from '../utils/sanitize.js';
 
@@ -38,6 +40,11 @@ interface PeerConnectionState {
   iceRestartCount: number;
 }
 
+interface RtcRestartState {
+  lastRestartAt: number;
+  restartCount: number;
+}
+
 export class SignalServer {
   private rooms = new Map<string, Set<string>>();
   private userRooms = new Map<string, { roomId: string; userId: string; color: string }>();
@@ -46,12 +53,39 @@ export class SignalServer {
   private events = new Map<string, any[]>();
   private rateLimits = new Map<string, RateLimitEntry>();
   private peerConnections = new Map<string, PeerConnectionState>(); // key: `${roomId}:${socketId}`
+  private rtcRestartState = new Map<string, RtcRestartState>(); // key: `${roomId}:${socketId}:${targetSocketId}`
   private readonly MAX_ICE_RESTARTS = 3;
   private readonly ICE_RESTART_COOLDOWN_MS = 5000;
 
   constructor(io: SocketServer) {
     this.io = io;
+    this.setupRedisAdapter();
     this.setupHandlers();
+  }
+
+  /**
+   * Initialize Redis adapter for horizontal scaling
+   * Requires REDIS_URL environment variable
+   */
+  private async setupRedisAdapter(): Promise<void> {
+    const redisUrl = process.env.REDIS_URL;
+    if (!redisUrl) return; // Skip if not configured (single instance mode)
+
+    try {
+      const pubClient = createClient({ url: redisUrl });
+      const subClient = pubClient.duplicate();
+      
+      await Promise.all([
+        pubClient.connect(),
+        subClient.connect()
+      ]);
+
+      this.io.adapter(createAdapter(pubClient, subClient));
+      console.log('Redis adapter enabled for Socket.io horizontal scaling');
+    } catch (err) {
+      console.error('Failed to initialize Redis adapter:', err);
+      // Continue without Redis adapter
+    }
   }
 
   private assignColor(): string {
